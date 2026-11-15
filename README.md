@@ -3,6 +3,7 @@
 **The simple way to build RAG + MCP + LLM pipelines. A clean alternative to LangChain.**
 
 [![CI](https://github.com/SreejaPasula/flowmcp/actions/workflows/ci.yml/badge.svg)](https://github.com/SreejaPasula/flowmcp/actions)
+[![codecov](https://codecov.io/gh/SreejaPasula/flowmcp/branch/main/graph/badge.svg)](https://codecov.io/gh/SreejaPasula/flowmcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -24,8 +25,10 @@ LangChain does this but needs hundreds of lines of setup. **flowmcp does it in 5
 
 ```bash
 pip install flowmcp
-pip install flowmcp[openai]   # for OpenAI
+pip install flowmcp[openai]    # for OpenAI
 pip install flowmcp[anthropic] # for Anthropic
+pip install flowmcp[gemini]    # for Gemini
+pip install flowmcp[pdf]       # for PDF document loading
 ```
 
 ```python
@@ -69,7 +72,7 @@ String answer = pipeline.ask("What is our refund policy?");
 | OpenAI | ✅ | ✅ |
 | Anthropic | ✅ | 🚧 |
 | Ollama (local) | ✅ | ✅ |
-| Gemini | 🚧 | 🚧 |
+| Gemini | ✅ | 🚧 |
 
 ✅ = done · 🚧 = contributions welcome
 
