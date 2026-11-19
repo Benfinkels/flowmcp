@@ -1,8 +1,26 @@
 import pytest
 from unittest.mock import patch, MagicMock
+from flowmcp.rag.retriever import Retriever
 from flowmcp import Pipeline
 from flowmcp.rag.chunker import chunk_text
-from flowmcp.rag.retriever import Retriever
+
+
+@pytest.fixture(autouse=True)
+def use_test_embedding_model(monkeypatch):
+    class TestEmbeddingModel:
+        def encode(self, texts, convert_to_numpy=True):
+            vectors = []
+            for text in texts:
+                vector = [0.0] * 64
+                for token in text.lower().split():
+                    vector[sum(token.encode("utf-8")) % len(vector)] += 1.0
+                vectors.append(vector)
+            return vectors
+
+    monkeypatch.setattr(
+        "flowmcp.rag.retriever._load_embedding_model",
+        lambda model_name: TestEmbeddingModel(),
+    )
 
 
 def test_chunk_text_basic():
@@ -18,17 +36,44 @@ def test_chunk_text_small():
 
 
 def test_retriever_returns_relevant_chunks():
-    retriever = Retriever()
-    retriever.add(["refund policy allows 30 days", "we ship globally", "contact support here"])
-    results = retriever.search("refund")
+    vectors = {
+        "the car is parked outside": [1.0, 0.0],
+        "refund policy allows 30 days": [0.0, 1.0],
+        "we ship globally": [0.0, 0.5],
+    }
+
+    def embed(texts):
+        return [
+            [1.0, 0.0] if text == "automobile" else vectors[text]
+            for text in texts
+        ]
+
+    retriever = Retriever(embedder=embed)
+    retriever.add(list(vectors))
+    results = retriever.search("automobile")
     assert len(results) >= 1
-    assert "refund" in results[0]
+    assert results[0] == "the car is parked outside"
 
 
 def test_retriever_empty():
     retriever = Retriever()
     results = retriever.search("anything")
     assert results == []
+
+
+def test_retriever_returns_no_results_for_blank_query():
+    retriever = Retriever(embedder=lambda texts: [[1.0, 0.0] for _ in texts])
+    retriever.add(["document text"])
+    assert retriever.search("   ") == []
+
+
+def test_retriever_rejects_mismatched_embedding_dimensions():
+    vectors = iter([[1.0, 0.0], [1.0, 0.0, 0.0]])
+    retriever = Retriever(embedder=lambda texts: [next(vectors) for _ in texts])
+    retriever.add(["first document"])
+
+    with pytest.raises(ValueError, match="inconsistent dimensions"):
+        retriever.add(["second document"])
 
 
 def test_pipeline_ask_with_rag(tmp_path):

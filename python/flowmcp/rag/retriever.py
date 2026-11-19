@@ -1,77 +1,84 @@
-from typing import List
-import re
 import math
+from typing import Callable, List, Optional, Sequence
 
-STOP_WORDS = {
-    "a","an","the","is","are","was","were","be","been","being","have","has",
-    "had","do","does","did","will","would","shall","should","may","might",
-    "must","can","could","to","of","in","on","at","by","for","with","about",
-    "what","how","it","this","that","these","those","i","you","we","they",
-    "and","or","its","our","your","their","my","me","us","him","her","them",
-}
+DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+EmbeddingFunction = Callable[[List[str]], Sequence[Sequence[float]]]
 
 
-def _tokenize(text: str) -> List[str]:
-    """Lowercase, strip punctuation, remove stop words."""
-    tokens = re.findall(r"\b[a-z0-9]+\b", text.lower())
-    return [t for t in tokens if t not in STOP_WORDS and len(t) > 1]
+def _load_embedding_model(model_name: str):
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise ImportError(
+            "Install embedding support with `pip install flowmcp[embeddings]`."
+        ) from exc
+    return SentenceTransformer(model_name)
 
 
 class Retriever:
-    """
-    BM25 retriever — same algorithm used by Elasticsearch and Lucene.
-    No external dependencies required.
-    Contributors can add vector/embedding based retrieval as an enhancement.
-    """
+    """Retrieve chunks by cosine similarity between text embeddings."""
 
-    def __init__(self, k1: float = 1.5, b: float = 0.75):
-        self.k1 = k1
-        self.b = b
+    def __init__(
+        self,
+        model_name: str = DEFAULT_EMBEDDING_MODEL,
+        embedder: Optional[EmbeddingFunction] = None,
+    ):
+        self.model_name = model_name
+        self._embedder = embedder
+        self._model = None
         self.chunks: List[str] = []
-        self._tokens: List[List[str]] = []      # tokenised chunks
-        self._df: dict = {}                      # document frequency per term
-        self._avgdl: float = 0.0
+        self._embeddings: List[List[float]] = []
+
+    def _encode(self, texts: List[str]) -> List[List[float]]:
+        if self._embedder is not None:
+            encoded = self._embedder(texts)
+        else:
+            if self._model is None:
+                self._model = _load_embedding_model(self.model_name)
+            encoded = self._model.encode(texts, convert_to_numpy=True)
+
+        vectors = [[float(value) for value in vector] for vector in encoded]
+        if len(vectors) != len(texts):
+            raise ValueError("The embedding model must return one vector per text.")
+        if any(not vector for vector in vectors):
+            raise ValueError("The embedding model returned an empty vector.")
+        if vectors and any(len(vector) != len(vectors[0]) for vector in vectors):
+            raise ValueError("The embedding model returned vectors with inconsistent dimensions.")
+        return vectors
 
     def add(self, chunks: List[str]):
-        for chunk in chunks:
-            tokens = _tokenize(chunk)
-            self.chunks.append(chunk)
-            self._tokens.append(tokens)
-            for term in set(tokens):
-                self._df[term] = self._df.get(term, 0) + 1
-        if self._tokens:
-            self._avgdl = sum(len(t) for t in self._tokens) / len(self._tokens)
+        if not chunks:
+            return
 
-    def _idf(self, term: str) -> float:
-        n = len(self.chunks)
-        df = self._df.get(term, 0)
-        return math.log((n - df + 0.5) / (df + 0.5) + 1)
+        embeddings = self._encode(chunks)
+        if self._embeddings and any(
+            len(vector) != len(self._embeddings[0]) for vector in embeddings
+        ):
+            raise ValueError("The embedding model returned vectors with inconsistent dimensions.")
+        self.chunks.extend(chunks)
+        self._embeddings.extend(embeddings)
 
-    def _bm25(self, query_terms: List[str], doc_idx: int) -> float:
-        tokens = self._tokens[doc_idx]
-        dl = len(tokens)
-        tf_map: dict = {}
-        for t in tokens:
-            tf_map[t] = tf_map.get(t, 0) + 1
-
-        score = 0.0
-        for term in query_terms:
-            tf = tf_map.get(term, 0)
-            if tf == 0:
-                continue
-            idf = self._idf(term)
-            norm = tf * (self.k1 + 1) / (tf + self.k1 * (1 - self.b + self.b * dl / max(self._avgdl, 1)))
-            score += idf * norm
-        return score
+    @staticmethod
+    def _cosine_similarity(left: List[float], right: List[float]) -> float:
+        left_norm = math.sqrt(math.fsum(value * value for value in left))
+        right_norm = math.sqrt(math.fsum(value * value for value in right))
+        if left_norm == 0 or right_norm == 0:
+            return 0.0
+        dot_product = math.fsum(a * b for a, b in zip(left, right))
+        return dot_product / (left_norm * right_norm)
 
     def search(self, query: str, top_k: int = 3) -> List[str]:
-        if not self.chunks:
+        if not self.chunks or top_k <= 0 or not query.strip():
             return []
 
-        query_terms = _tokenize(query)
-        if not query_terms:
-            return self.chunks[:top_k]
-
-        scores = [self._bm25(query_terms, i) for i in range(len(self.chunks))]
-        ranked = sorted(zip(scores, self.chunks), key=lambda x: x[0], reverse=True)
-        return [chunk for _, chunk in ranked[:top_k]]
+        query_embedding = self._encode([query])[0]
+        if len(query_embedding) != len(self._embeddings[0]):
+            raise ValueError("The embedding model returned vectors with inconsistent dimensions.")
+        ranked = sorted(
+            range(len(self.chunks)),
+            key=lambda index: self._cosine_similarity(
+                query_embedding, self._embeddings[index]
+            ),
+            reverse=True,
+        )
+        return [self.chunks[index] for index in ranked[:top_k]]

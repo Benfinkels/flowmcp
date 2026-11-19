@@ -1,7 +1,7 @@
 import os
-from typing import List, Union
+from typing import List, Optional, Union
 from .chunker import chunk_text
-from .retriever import Retriever
+from .retriever import DEFAULT_EMBEDDING_MODEL, EmbeddingFunction, Retriever
 
 DOC_EXTENSIONS = (
     ".txt", ".md", ".pdf", ".json", ".csv", ".rst", ".html", ".xml", ".yaml", ".yml"
@@ -17,9 +17,14 @@ class RAG:
         chunks = rag.retrieve("What is the refund policy?")
     """
 
-    def __init__(self, source: Union[str, List[str]]):
+    def __init__(
+        self,
+        source: Union[str, List[str]],
+        embedding_model: str = DEFAULT_EMBEDDING_MODEL,
+        embedder: Optional[EmbeddingFunction] = None,
+    ):
         sources = [source] if isinstance(source, (str, bytes, os.PathLike)) else source
-        self.retriever = Retriever()
+        self.retriever = Retriever(model_name=embedding_model, embedder=embedder)
 
         for src in sources:
             src_str = str(src).strip()
