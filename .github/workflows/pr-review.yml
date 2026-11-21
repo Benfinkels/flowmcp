@@ -57,4 +57,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr comment ${{ steps.pr.outputs.number }} --body "$(cat review.txt)"
+          if [ -s review.txt ]; then
+            gh pr comment ${{ steps.pr.outputs.number }} --body "$(cat review.txt)"
+          fi
