@@ -42,3 +42,6 @@ Issues = "https://github.com/SreejaPasula/flowmcp/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[project.scripts]
+flowmcp = "flowmcp.cli:main"
