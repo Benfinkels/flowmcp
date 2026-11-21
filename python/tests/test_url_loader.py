@@ -1,8 +1,28 @@
-import sys
+
+import re
 import sys
 import types
 from unittest.mock import MagicMock
 from flowmcp.rag.loader import RAG
+
+
+class _FakeSoup:
+    def __init__(self, html: str, parser: str):
+        self._html = html
+
+    def __call__(self, tags):
+        return []
+
+    def get_text(self, separator: str = " ", strip: bool = False) -> str:
+        cleaned = re.sub(
+            r"<(script|style|noscript)[^>]*>.*?</\1>",
+            "",
+            self._html,
+            flags=re.S | re.I,
+        )
+        text = re.sub(r"<[^>]+>", separator, cleaned)
+        parts = [p.strip() for p in text.split() if p.strip()]
+        return separator.join(parts) if strip else " ".join(parts)
 
 
 def test_rag_loads_and_chunks_url(monkeypatch):
@@ -18,10 +38,8 @@ def test_rag_loads_and_chunks_url(monkeypatch):
     fake_httpx = types.ModuleType("httpx")
     fake_httpx.get = mock_get
 
-    from bs4 import BeautifulSoup
-
     fake_bs4 = types.ModuleType("bs4")
-    fake_bs4.BeautifulSoup = BeautifulSoup
+    fake_bs4.BeautifulSoup = _FakeSoup
 
     monkeypatch.setitem(sys.modules, "httpx", fake_httpx)
     monkeypatch.setitem(sys.modules, "bs4", fake_bs4)
