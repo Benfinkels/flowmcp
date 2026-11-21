@@ -34,3 +34,18 @@ class GeminiClient(LLMBase):
             return response.text
         except ImportError:
             raise ImportError("Install google-genai: pip install google-genai")
+
+    async def acomplete(self, prompt: str) -> str:
+        try:
+            import google.genai as genai
+            kwargs = {}
+            if self.api_key:
+                kwargs["api_key"] = self.api_key
+            client = genai.Client(**kwargs)
+            response = await client.aio.models.generate_content(model=self.model, contents=prompt)
+            return response.text
+        except (ImportError, AttributeError):
+            pass
+
+        import asyncio
+        return await asyncio.to_thread(self.complete, prompt)

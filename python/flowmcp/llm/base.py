@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+import asyncio
 
 
 class LLMBase(ABC):
     @abstractmethod
     def complete(self, prompt: str) -> str:
         pass
+
+    async def acomplete(self, prompt: str) -> str:
+        return await asyncio.to_thread(self.complete, prompt)
 
 
 class LLM:

@@ -17,3 +17,16 @@ class AnthropicClient(LLMBase):
             messages=[{"role": "user", "content": prompt}]
         )
         return message.content[0].text
+
+    async def acomplete(self, prompt: str) -> str:
+        try:
+            import anthropic
+        except ImportError:
+            raise ImportError("Install anthropic: pip install anthropic")
+        client = anthropic.AsyncAnthropic()
+        message = await client.messages.create(
+            model=self.model,
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return message.content[0].text
