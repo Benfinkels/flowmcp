@@ -1,3 +1,5 @@
+
+
 import os
 from typing import List, Optional, Union
 from .chunker import chunk_text
@@ -28,7 +30,9 @@ class RAG:
 
         for src in sources:
             src_str = str(src).strip()
-            if os.path.isdir(src_str):
+            if self._is_url(src_str):
+                self._load_url(src_str)
+            elif os.path.isdir(src_str):
                 self._load_directory(src_str)
             elif os.path.isfile(src_str):
                 self._load_file(src_str)
@@ -38,6 +42,11 @@ class RAG:
                 )
             else:
                 self._load_text(src_str)
+
+    @staticmethod
+    def _is_url(src_str: str) -> bool:
+        """Determines if a source is an HTTP or HTTPS URL."""
+        return src_str.lower().startswith(("http://", "https://"))
 
     @staticmethod
     def _is_path_like(src_str: str) -> bool:
@@ -62,9 +71,9 @@ class RAG:
         """
         Extracts plain text from digital PDF files using pypdf.
         Handles edge cases:
-          - Password-protected/encrypted PDFs (raises clear ValueError)
-          - Whitespace/blank pages (filtered out)
-          - Scanned/image-only PDFs with no text layer (returns empty string)
+- Password-protected/encrypted PDFs (raises clear ValueError)
+- Whitespace/blank pages (filtered out)
+- Scanned/image-only PDFs with no text layer (returns empty string)
         """
         try:
             from pypdf import PdfReader
@@ -83,6 +92,33 @@ class RAG:
 
         return "\n\n".join(text_parts)
 
+    def _fetch_url_text(self, url: str) -> str:
+        """Fetches web content via httpx and strips HTML tags using BeautifulSoup."""
+        try:
+            import httpx
+        except ImportError:
+            raise ImportError("Install httpx to load documents from a URL: pip install httpx")
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError:
+            raise ImportError(
+                "Install beautifulsoup4 to parse HTML from a URL: pip install beautifulsoup4"
+            )
+
+        response = httpx.get(url, follow_redirects=True, timeout=15.0)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        for tag in soup(["script", "style", "noscript"]):
+            tag.decompose()
+
+        return soup.get_text(separator=" ", strip=True)
+
+    def _load_url(self, url: str):
+        text = self._fetch_url_text(url)
+        chunks = chunk_text(text)
+        self.retriever.add(chunks)
+
     def _load_file(self, path: str):
         if path.endswith(".pdf"):
             text = self._read_pdf(path)
@@ -98,3 +134,6 @@ class RAG:
 
     def retrieve(self, query: str, top_k: int = 3) -> List[str]:
         return self.retriever.search(query, top_k)
+
+
+
