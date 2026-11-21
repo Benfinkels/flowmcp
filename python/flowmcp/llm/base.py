@@ -47,5 +47,8 @@ class LLM:
         elif provider == "groq":
             from .groq import GroqClient
             return GroqClient(model)
+        elif provider == "huggingface":
+            from .huggingface import HuggingFaceClient
+            return HuggingFaceClient(model)
         else:
-            raise ValueError(f"Unsupported provider '{provider}'. Supported: openai, anthropic, ollama, gemini, mistral, groq")
+            raise ValueError(f"Unsupported provider '{provider}'. Supported: openai, anthropic, ollama, gemini, mistral, groq, huggingface")

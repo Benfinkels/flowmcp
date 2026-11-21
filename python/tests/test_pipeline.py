@@ -705,3 +705,39 @@ def test_groq_client_missing_dependency():
     with patch.dict("sys.modules", {"groq": None}):
         with pytest.raises(ImportError, match="Install groq"):
             GroqClient("llama3-8b-8192").complete("Hello")
+
+
+def test_huggingface_client_complete():
+    from flowmcp.llm.huggingface import HuggingFaceClient
+
+    mock_hf = MagicMock()
+    mock_client = MagicMock()
+    mock_client.text_generation.return_value = "Hello from HuggingFace"
+    mock_hf.InferenceClient.return_value = mock_client
+
+    with patch.dict("sys.modules", {"huggingface_hub": mock_hf}):
+        client = HuggingFaceClient("mistralai/Mistral-7B-Instruct-v0.3", api_key="dummy_key")
+        result = client.complete("Hello")
+        assert result == "Hello from HuggingFace"
+        mock_client.text_generation.assert_called_once_with("Hello", max_new_tokens=512)
+
+
+def test_huggingface_client_from_string():
+    from flowmcp.llm.base import LLM
+    from flowmcp.llm.huggingface import HuggingFaceClient
+
+    mock_hf = MagicMock()
+    mock_hf.InferenceClient.return_value = MagicMock()
+
+    with patch.dict("sys.modules", {"huggingface_hub": mock_hf}):
+        client = LLM.from_string("huggingface/mistralai/Mistral-7B-Instruct-v0.3")
+        assert isinstance(client, HuggingFaceClient)
+        assert client.model == "mistralai/Mistral-7B-Instruct-v0.3"
+
+
+def test_huggingface_client_missing_dependency():
+    from flowmcp.llm.huggingface import HuggingFaceClient
+
+    with patch.dict("sys.modules", {"huggingface_hub": None}):
+        with pytest.raises(ImportError, match="Install huggingface_hub"):
+            HuggingFaceClient("mistralai/Mistral-7B-Instruct-v0.3").complete("Hello")
