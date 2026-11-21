@@ -17,7 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
     ask_parser.add_argument(
         "--llm",
         required=True,
-        help="LLM provider/model string ^(e.g., openai/gpt-4^).",
+        help="LLM provider/model string (e.g., openai/gpt-4).",
     )
     ask_parser.add_argument(
         "--docs",
