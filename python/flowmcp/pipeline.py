@@ -1,6 +1,7 @@
 from typing import Optional, List, Union
 from .llm.base import LLM
 from .rag.loader import RAG
+from .rag.retriever import DEFAULT_EMBEDDING_MODEL
 from .mcp.client import MCP
 
 
@@ -22,9 +23,10 @@ class Pipeline:
         llm: Union[str, LLM],
         docs: Optional[Union[str, List[str]]] = None,
         tools: Optional[List[str]] = None,
+        embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     ):
         self.llm = LLM.from_string(llm) if isinstance(llm, str) else llm
-        self.rag = RAG(docs) if docs else None
+        self.rag = RAG(docs, embedding_model=embedding_model) if docs else None
         self.mcp = MCP(tools) if tools else None
 
     def ask(self, question: str) -> str:
