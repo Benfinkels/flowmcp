@@ -41,5 +41,11 @@ class LLM:
         elif provider == "gemini":
             from .gemini import GeminiClient
             return GeminiClient(model)
+        elif provider == "mistral":
+            from .mistral import MistralClient
+            return MistralClient(model)
+        elif provider == "groq":
+            from .groq import GroqClient
+            return GroqClient(model)
         else:
-            raise ValueError(f"Unsupported provider '{provider}'. Supported: openai, anthropic, ollama, gemini")
+            raise ValueError(f"Unsupported provider '{provider}'. Supported: openai, anthropic, ollama, gemini, mistral, groq")
