@@ -664,3 +664,44 @@ def test_mistral_client_missing_dependency():
     with patch.dict("sys.modules", {"mistralai": None}):
         with pytest.raises(ImportError, match="Install mistralai"):
             MistralClient("mistral-small-latest").complete("Hello")
+
+
+def test_groq_client_complete():
+    from flowmcp.llm.groq import GroqClient
+
+    mock_groq = MagicMock()
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "Hello from Groq"
+    mock_client.chat.completions.create.return_value = mock_response
+    mock_groq.Groq.return_value = mock_client
+
+    with patch.dict("sys.modules", {"groq": mock_groq}):
+        client = GroqClient("llama3-8b-8192", api_key="dummy_key")
+        result = client.complete("Hello")
+        assert result == "Hello from Groq"
+        mock_client.chat.completions.create.assert_called_once_with(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": "Hello"}]
+        )
+
+
+def test_groq_client_from_string():
+    from flowmcp.llm.base import LLM
+    from flowmcp.llm.groq import GroqClient
+
+    mock_groq = MagicMock()
+    mock_groq.Groq.return_value = MagicMock()
+
+    with patch.dict("sys.modules", {"groq": mock_groq}):
+        client = LLM.from_string("groq/llama3-8b-8192")
+        assert isinstance(client, GroqClient)
+        assert client.model == "llama3-8b-8192"
+
+
+def test_groq_client_missing_dependency():
+    from flowmcp.llm.groq import GroqClient
+
+    with patch.dict("sys.modules", {"groq": None}):
+        with pytest.raises(ImportError, match="Install groq"):
+            GroqClient("llama3-8b-8192").complete("Hello")
