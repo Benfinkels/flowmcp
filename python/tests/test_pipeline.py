@@ -623,3 +623,44 @@ def test_pipeline_missing_docs_path_raises_error():
     with pytest.raises(FileNotFoundError, match="does not exist"):
         Pipeline(llm=mock_llm, docs="./missing_directory_12345")
 
+
+def test_mistral_client_complete():
+    from flowmcp.llm.mistral import MistralClient
+
+    mock_mistralai = MagicMock()
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "Hello from Mistral"
+    mock_client.chat.complete.return_value = mock_response
+    mock_mistralai.Mistral.return_value = mock_client
+
+    with patch.dict("sys.modules", {"mistralai": mock_mistralai}):
+        client = MistralClient("mistral-small-latest", api_key="dummy_key")
+        result = client.complete("Hello")
+        assert result == "Hello from Mistral"
+        mock_client.chat.complete.assert_called_once_with(
+            model="mistral-small-latest",
+            messages=[{"role": "user", "content": "Hello"}]
+        )
+
+
+def test_mistral_client_from_string():
+    from flowmcp.llm.base import LLM
+    from flowmcp.llm.mistral import MistralClient
+
+    mock_mistralai = MagicMock()
+    mock_client = MagicMock()
+    mock_mistralai.Mistral.return_value = mock_client
+
+    with patch.dict("sys.modules", {"mistralai": mock_mistralai}):
+        client = LLM.from_string("mistral/mistral-small-latest")
+        assert isinstance(client, MistralClient)
+        assert client.model == "mistral-small-latest"
+
+
+def test_mistral_client_missing_dependency():
+    from flowmcp.llm.mistral import MistralClient
+
+    with patch.dict("sys.modules", {"mistralai": None}):
+        with pytest.raises(ImportError, match="Install mistralai"):
+            MistralClient("mistral-small-latest").complete("Hello")
