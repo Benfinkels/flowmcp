@@ -741,3 +741,115 @@ def test_huggingface_client_missing_dependency():
     with patch.dict("sys.modules", {"huggingface_hub": None}):
         with pytest.raises(ImportError, match="Install huggingface_hub"):
             HuggingFaceClient("mistralai/Mistral-7B-Instruct-v0.3").complete("Hello")
+
+
+# --- Token usage tracking tests ---
+
+def test_openai_client_last_usage():
+    from flowmcp.llm.openai import OpenAIClient
+
+    mock_openai = MagicMock()
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "Hello"
+    mock_response.usage.prompt_tokens = 5
+    mock_response.usage.completion_tokens = 10
+    mock_response.usage.total_tokens = 15
+    mock_client.chat.completions.create.return_value = mock_response
+    mock_openai.OpenAI.return_value = mock_client
+
+    with patch.dict("sys.modules", {"openai": mock_openai}):
+        client = OpenAIClient("gpt-4")
+        client.complete("Hello")
+        assert client.last_usage == {
+            "prompt_tokens": 5,
+            "completion_tokens": 10,
+            "total_tokens": 15,
+        }
+
+
+def test_anthropic_client_last_usage():
+    from flowmcp.llm.anthropic import AnthropicClient
+
+    mock_anthropic = MagicMock()
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.content[0].text = "Hello"
+    mock_response.usage.input_tokens = 8
+    mock_response.usage.output_tokens = 12
+    mock_client.messages.create.return_value = mock_response
+    mock_anthropic.Anthropic.return_value = mock_client
+
+    with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
+        client = AnthropicClient("claude-3-5-sonnet-20241022")
+        client.complete("Hello")
+        assert client.last_usage == {
+            "prompt_tokens": 8,
+            "completion_tokens": 12,
+            "total_tokens": 20,
+        }
+
+
+def test_gemini_client_last_usage():
+    from flowmcp.llm.gemini import GeminiClient
+
+    mock_google = MagicMock()
+    mock_genai = MagicMock()
+    mock_google.genai = mock_genai
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "Hello from Gemini"
+    mock_response.usage_metadata.prompt_token_count = 6
+    mock_response.usage_metadata.candidates_token_count = 11
+    mock_response.usage_metadata.total_token_count = 17
+    mock_client.models.generate_content.return_value = mock_response
+    mock_genai.Client.return_value = mock_client
+
+    with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
+        client = GeminiClient("gemini-2.0-flash", api_key="dummy_key")
+        client.complete("Hello")
+        assert client.last_usage == {
+            "prompt_tokens": 6,
+            "completion_tokens": 11,
+            "total_tokens": 17,
+        }
+
+
+def test_ollama_client_last_usage():
+    from flowmcp.llm.ollama import OllamaClient
+    import json
+
+    mock_data = {
+        "response": "Hello from Ollama",
+        "prompt_eval_count": 7,
+        "eval_count": 14,
+    }
+
+    class FakeResponse:
+        def read(self):
+            return json.dumps(mock_data).encode()
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+
+    with patch("urllib.request.urlopen", return_value=FakeResponse()):
+        client = OllamaClient("llama3")
+        result = client.complete("Hello")
+        assert result == "Hello from Ollama"
+        assert client.last_usage == {
+            "prompt_tokens": 7,
+            "completion_tokens": 14,
+            "total_tokens": 21,
+        }
+
+
+def test_llm_base_last_usage_default():
+    from flowmcp.llm.base import LLMBase
+
+    class MinimalClient(LLMBase):
+        def complete(self, prompt: str) -> str:
+            return "ok"
+
+    client = MinimalClient()
+    assert client.last_usage == {}
