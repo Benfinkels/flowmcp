@@ -16,3 +16,15 @@ class OpenAIClient(LLMBase):
             messages=[{"role": "user", "content": prompt}]
         )
         return response.choices[0].message.content
+
+    async def acomplete(self, prompt: str) -> str:
+        try:
+            from openai import AsyncOpenAI
+        except ImportError:
+            raise ImportError("Install openai: pip install openai")
+        client = AsyncOpenAI()
+        response = await client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content

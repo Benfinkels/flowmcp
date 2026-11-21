@@ -140,11 +140,9 @@ try:
     with urllib.request.urlopen(req) as response:
         result = json.loads(response.read())
         review = result["choices"][0]["message"]["content"]
+    with open("review.txt", "w") as f:
+        f.write(review)
+    print(review)
 except Exception as e:
     print(f"PR review bot skipped: {e}")
-    raise SystemExit(0)
-
-with open("review.txt", "w") as f:
-    f.write(review)
-
-print(review)
+    sys.exit(0)

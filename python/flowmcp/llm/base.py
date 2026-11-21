@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+import asyncio
 
 
 class LLMBase(ABC):
     @abstractmethod
     def complete(self, prompt: str) -> str:
         pass
+
+    async def acomplete(self, prompt: str) -> str:
+        return await asyncio.to_thread(self.complete, prompt)
 
 
 class LLM:
@@ -38,5 +41,11 @@ class LLM:
         elif provider == "gemini":
             from .gemini import GeminiClient
             return GeminiClient(model)
+        elif provider == "mistral":
+            from .mistral import MistralClient
+            return MistralClient(model)
+        elif provider == "groq":
+            from .groq import GroqClient
+            return GroqClient(model)
         else:
-            raise ValueError(f"Unsupported provider '{provider}'. Supported: openai, anthropic, ollama, gemini")
+            raise ValueError(f"Unsupported provider '{provider}'. Supported: openai, anthropic, ollama, gemini, mistral, groq")

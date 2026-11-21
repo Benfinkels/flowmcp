@@ -16,6 +16,7 @@ class Pipeline:
             tools=["filesystem", "github"]
         )
         answer = pipeline.ask("What is our refund policy?")
+        answer = await pipeline.aask("What is our refund policy?")
     """
 
     def __init__(
@@ -42,6 +43,21 @@ class Pipeline:
 
         prompt = self._build_prompt(question, context, tool_results)
         return self.llm.complete(prompt)
+
+    async def aask(self, question: str) -> str:
+        import asyncio
+
+        context = ""
+        if self.rag:
+            chunks = await asyncio.to_thread(self.rag.retrieve, question)
+            context = "\n\n".join(chunks)
+
+        tool_results = ""
+        if self.mcp:
+            tool_results = await self.mcp.arun(question)
+
+        prompt = self._build_prompt(question, context, tool_results)
+        return await self.llm.acomplete(prompt)
 
     def _build_prompt(self, question: str, context: str, tool_results: str) -> str:
         parts = []
