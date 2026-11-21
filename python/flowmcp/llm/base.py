@@ -3,6 +3,8 @@ import asyncio
 
 
 class LLMBase(ABC):
+    last_usage: dict = {}
+
     @abstractmethod
     def complete(self, prompt: str) -> str:
         pass
